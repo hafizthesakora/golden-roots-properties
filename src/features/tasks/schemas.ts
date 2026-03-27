@@ -9,4 +9,7 @@ export const createTaskSchema = z.object({
   dueDate: z.coerce.date(),
   projectId: z.string().trim().min(1, 'Required'),
   description: z.string().optional(),
+  isRecurring: z.boolean().optional(),
+  recurringInterval: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
+  recurringEndDate: z.string().optional(),
 });

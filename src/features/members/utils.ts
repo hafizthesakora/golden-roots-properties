@@ -1,22 +1,29 @@
-import { Query, type Databases } from 'node-appwrite';
-
-import { DATABASE_ID, MEMBERS_ID } from '@/config';
+import { connectDB } from '@/lib/db';
+import { Member } from '@/models';
+import type { MemberRole } from './types';
 
 interface GetMemberProps {
-  databases: Databases;
   workspaceId: string;
   userId: string;
 }
 
-export const getMember = async ({
-  databases,
-  workspaceId,
-  userId,
-}: GetMemberProps) => {
-  const members = await databases.listDocuments(DATABASE_ID, MEMBERS_ID, [
-    Query.equal('workspaceId', workspaceId),
-    Query.equal('userId', userId),
-  ]);
+export interface MemberDoc {
+  $id: string;
+  $createdAt: string;
+  userId: string;
+  workspaceId: string;
+  role: MemberRole;
+}
 
-  return members.documents[0];
+export const getMember = async ({ workspaceId, userId }: GetMemberProps): Promise<MemberDoc | null> => {
+  await connectDB();
+  const member = await Member.findOne({ workspaceId, userId }).lean() as Record<string, unknown> | null;
+  if (!member) return null;
+  return {
+    $id: String(member._id),
+    $createdAt: member.createdAt instanceof Date ? (member.createdAt as Date).toISOString() : '',
+    userId: String(member.userId),
+    workspaceId: String(member.workspaceId),
+    role: String(member.role) as MemberRole,
+  };
 };

@@ -17,10 +17,10 @@ export const Projects = () => {
   return (
     <div className="flex flex-col gap-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase text-neutral-500">Projects</p>
+        <p className="text-xs uppercase text-white/50 font-semibold tracking-wider">Projects</p>
         <RiAddCircleFill
           onClick={open}
-          className="size-5 text-neutral-500 cursor-pointer hover:opacity-75 transition"
+          className="size-5 text-white/50 cursor-pointer hover:text-white transition"
         />
       </div>
       {data?.documents.map((project) => {
@@ -31,12 +31,12 @@ export const Projects = () => {
           <Link href={href} key={project.$id}>
             <div
               className={cn(
-                'flex items-center gap-2.5 p-2.5 rounded-md hover:opacity-75 transition cursor-pointer text-neutral-500',
-                isActive && 'bg-white shadow-sm hover:opacity-100 text-primary'
+                'flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all cursor-pointer text-white/60 hover:text-white hover:bg-white/10 text-sm font-medium',
+                isActive && 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
               )}
             >
               <ProjectAvatar image={project.imageUrl} name={project.name} />
-              <span className="truncate">{project.name}</span>
+              <span className="truncate text-sm">{project.name}</span>
             </div>
           </Link>
         );

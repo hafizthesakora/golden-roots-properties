@@ -58,9 +58,8 @@ export const EditTaskForm = ({
     defaultValues: {
       ...initialValues,
       workspaceId: workspaceId,
-      dueDate: initialValues.dueDate
-        ? new Date(initialValues.dueDate)
-        : undefined,
+      dueDate: initialValues.dueDate ? new Date(initialValues.dueDate) : undefined,
+      recurringInterval: (initialValues.recurringInterval as 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined),
     },
   });
 

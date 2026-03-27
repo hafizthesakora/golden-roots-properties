@@ -10,7 +10,7 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { useRouter } from 'next/navigation';
 
 interface TaskBreadcrumbsProps {
-  project: Project;
+  project: Project | undefined;
   task: Task;
 }
 
@@ -43,13 +43,13 @@ export const TaskBreadcrumbs = ({ project, task }: TaskBreadcrumbsProps) => {
     <div className="flex items-center gap-x-2">
       <ConfirmDialog />
       <ProjectAvatar
-        name={project.name}
-        image={project.imageUrl}
+        name={project?.name ?? ''}
+        image={project?.imageUrl}
         className="size-6 lg:size-8"
       />
-      <Link href={`/workspaces/${workspaceId}/projects/${project.$id}`}>
+      <Link href={`/workspaces/${workspaceId}/projects/${project?.$id ?? ''}`}>
         <p className="text-sm lg:text-lg font-semibold text-muted-foreground hover:opacity-75 transition">
-          {project.name}
+          {project?.name}
         </p>
       </Link>
       <ChevronRightIcon className="size-4 lg:size-5 text-muted-foreground" />

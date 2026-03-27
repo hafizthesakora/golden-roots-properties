@@ -1,53 +1,59 @@
 import { Hono } from 'hono';
-
 import { zValidator } from '@hono/zod-validator';
-import { loginSchema, registerSchema } from '../schemas';
-import { createAdminClient } from '@/lib/appwrite';
-import { ID } from 'node-appwrite';
 import { deleteCookie, setCookie } from 'hono/cookie';
+import bcrypt from 'bcryptjs';
+
+import { loginSchema, registerSchema } from '../schemas';
 import { AUTH_COOKIE } from '../constants';
 import { sessionMiddleware } from '@/lib/session-middleware';
+import { connectDB } from '@/lib/db';
+import { User } from '@/models';
+import { signToken } from '@/lib/jwt';
+
+const COOKIE_OPTS = {
+  path: '/',
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 60 * 60 * 24 * 30,
+};
 
 const app = new Hono()
   .get('/current', sessionMiddleware, (c) => {
     const user = c.get('user');
-
-    return c.json({ data: user });
+    const { passwordHash: _, ...safe } = user as typeof user & { passwordHash?: string };
+    return c.json({ data: safe });
   })
   .post('/login', zValidator('json', loginSchema), async (c) => {
     const { email, password } = c.req.valid('json');
-    const { account } = await createAdminClient();
-    const session = await account.createEmailPasswordSession(email, password);
-    setCookie(c, AUTH_COOKIE, session.secret, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 30,
-    });
+
+    await connectDB();
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
+
+    const token = await signToken({ userId: user._id.toString(), email: user.email });
+    setCookie(c, AUTH_COOKIE, token, COOKIE_OPTS);
     return c.json({ success: true });
   })
   .post('/register', zValidator('json', registerSchema), async (c) => {
     const { name, email, password } = c.req.valid('json');
-    const { account } = await createAdminClient();
-    await account.create(ID.unique(), email, password, name);
 
-    const session = await account.createEmailPasswordSession(email, password);
+    await connectDB();
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) return c.json({ error: 'Email already in use' }, 400);
 
-    setCookie(c, AUTH_COOKIE, session.secret, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await User.create({ name, email: email.toLowerCase(), passwordHash });
+
+    const token = await signToken({ userId: user._id.toString(), email: user.email });
+    setCookie(c, AUTH_COOKIE, token, COOKIE_OPTS);
     return c.json({ success: true });
   })
-  .post('/logout', sessionMiddleware, async (c) => {
-    const account = c.get('account');
+  .post('/logout', sessionMiddleware, (c) => {
     deleteCookie(c, AUTH_COOKIE);
-    await account.deleteSession('current');
-
     return c.json({ success: true });
   });
 

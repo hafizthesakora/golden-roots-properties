@@ -1,44 +1,36 @@
 import 'server-only';
 
-import { Client, Account, Databases, Users } from 'node-appwrite';
 import { cookies } from 'next/headers';
 import { AUTH_COOKIE } from '@/features/auth/constants';
+import { verifyToken } from './jwt';
+import { connectDB } from './db';
+import { User, Member } from '@/models';
 
 export async function createSessionClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!);
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE)?.value;
 
-  const session = await cookies().get(AUTH_COOKIE);
+  if (!token) throw new Error('Unauthorized');
 
-  if (!session || !session.value) {
-    throw new Error('Unauthorized');
-  }
+  const payload = await verifyToken(token);
+  await connectDB();
 
-  client.setSession(session.value);
+  const rawUser = await User.findById(payload.userId).lean() as Record<string, unknown> | null;
+  if (!rawUser) throw new Error('Unauthorized');
 
-  return {
-    get account() {
-      return new Account(client);
-    },
-    get databases() {
-      return new Databases(client);
-    },
+  const userId = String(rawUser._id);
+
+  const user = {
+    ...rawUser,
+    $id: userId,
+    $createdAt: rawUser.createdAt instanceof Date ? rawUser.createdAt.toISOString() : String(rawUser.createdAt ?? ''),
   };
+
+  return { user };
 }
 
-export async function createAdminClient() {
-  const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!)
-    .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-  return {
-    get account() {
-      return new Account(client);
-    },
-    get users() {
-      return new Users(client);
-    },
-  };
+// Kept for compatibility — with MongoDB we query directly
+export async function getMemberForWorkspace(workspaceId: string, userId: string) {
+  await connectDB();
+  return Member.findOne({ workspaceId, userId }).lean();
 }

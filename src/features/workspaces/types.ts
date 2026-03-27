@@ -1,8 +1,8 @@
-import { Models } from 'node-appwrite';
-
-export type Workspace = Models.Document & {
+export type Workspace = {
+  $id: string;
+  $createdAt: string;
   name: string;
-  imageUrl: string;
+  imageUrl?: string;
   inviteCode: string;
   userId: string;
 };

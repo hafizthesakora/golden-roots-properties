@@ -1,57 +1,56 @@
 import 'server-only';
 
-import {
-  Account,
-  Client,
-  Databases,
-  Models,
-  Storage,
-  type Account as AccountType,
-  type Databases as DatabasesType,
-  type Storage as StorageType,
-  type Users as UsersType,
-} from 'node-appwrite';
-
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
-
 import { AUTH_COOKIE } from '@/features/auth/constants';
+import { verifyToken } from './jwt';
+import { connectDB } from './db';
+import { User } from '@/models';
+
+export interface SessionUser {
+  $id: string;
+  name: string;
+  email: string;
+  $createdAt: string;
+}
 
 type AdditionalContext = {
   Variables: {
-    account: AccountType;
-    databases: DatabasesType;
-    storage: StorageType;
-    users: UsersType;
-    user: Models.User<Models.Preferences>;
+    user: SessionUser;
   };
 };
 
 export const sessionMiddleware = createMiddleware<AdditionalContext>(
   async (c, next) => {
-    const client = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!);
+    const token = getCookie(c, AUTH_COOKIE);
 
-    const session = getCookie(c, AUTH_COOKIE);
-
-    if (!session) {
+    if (!token) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    client.setSession(session);
+    try {
+      const payload = await verifyToken(token);
+      await connectDB();
 
-    const account = new Account(client);
-    const databases = new Databases(client);
-    const storage = new Storage(client);
+      const raw = await User.findById(payload.userId).lean() as {
+        _id: { toString(): string };
+        name: string;
+        email: string;
+        createdAt?: Date;
+      } | null;
 
-    const user = await account.get();
+      if (!raw) return c.json({ error: 'Unauthorized' }, 401);
 
-    c.set('account', account);
-    c.set('databases', databases);
-    c.set('storage', storage);
-    c.set('user', user);
+      c.set('user', {
+        $id: raw._id.toString(),
+        name: raw.name,
+        email: raw.email,
+        $createdAt: raw.createdAt?.toISOString() ?? '',
+      });
 
-    await next();
+      await next();
+    } catch {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
   }
 );

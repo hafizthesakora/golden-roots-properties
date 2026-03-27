@@ -1,5 +1,4 @@
 import { UserButton } from '@/features/auth/components/user-button';
-import Image from 'next/image';
 import Link from 'next/link';
 
 interface StandAloneLayoutProps {
@@ -8,11 +7,12 @@ interface StandAloneLayoutProps {
 
 const StandAloneLayout = ({ children }: StandAloneLayoutProps) => {
   return (
-    <main className="bg-neutral-100 min-h-screen">
+    <main className="bg-neutral-50 min-h-screen">
       <div className="mx-auto max-w-screen-2xl p-4">
         <nav className="flex justify-between items-center h-[73px]">
-          <Link href="/">
-            <Image src="/acdt.png" alt="logo" height={56} width={152} />
+          <Link href="/" className="flex flex-col leading-tight">
+            <span className="text-green-800 font-bold text-lg tracking-wide">Golden Roots</span>
+            <span className="text-green-700/60 text-[11px] tracking-widest uppercase">Properties</span>
           </Link>
           <UserButton />
         </nav>

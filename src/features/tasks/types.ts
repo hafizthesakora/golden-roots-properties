@@ -1,5 +1,3 @@
-import { Models } from 'node-appwrite';
-
 export enum TaskStatus {
   BACKLOG = 'BACKLOG',
   TODO = 'TODO',
@@ -8,7 +6,9 @@ export enum TaskStatus {
   DONE = 'DONE',
 }
 
-export type Task = Models.Document & {
+export type Task = {
+  $id: string;
+  $createdAt: string;
   name: string;
   status: TaskStatus;
   workspaceId: string;
@@ -17,4 +17,12 @@ export type Task = Models.Document & {
   position: number;
   assigneeId: string;
   description?: string;
+  isRecurring?: boolean;
+  recurringInterval?: string;
+  recurringEndDate?: string;
+  // Populated fields (optional, returned by GET endpoints)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  project?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  assignee?: any;
 };

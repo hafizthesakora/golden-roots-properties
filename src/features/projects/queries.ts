@@ -1,34 +1,31 @@
 import { createSessionClient } from '@/lib/appwrite';
 import { getMember } from '../members/utils';
-import { DATABASE_ID, PROJECTS_ID } from '@/config';
-import { Project } from './types';
+import { connectDB } from '@/lib/db';
+import { Project } from '@/models';
+import type { Project as ProjectType } from './types';
 
 interface GetProjectProps {
   projectId: string;
 }
 
-export const getProject = async ({ projectId }: GetProjectProps) => {
+export const getProject = async ({ projectId }: GetProjectProps): Promise<ProjectType | null> => {
   try {
-    const { databases, account } = await createSessionClient();
-    const user = await account.get();
+    const { user } = await createSessionClient();
+    await connectDB();
 
-    const project = await databases.getDocument<Project>(
-      DATABASE_ID,
-      PROJECTS_ID,
-      projectId
-    );
+    const raw = await Project.findById(projectId).lean() as Record<string, unknown> | null;
+    if (!raw) return null;
 
-    const member = await getMember({
-      databases,
-      userId: user.$id,
-      workspaceId: project.workspaceId,
-    });
+    const member = await getMember({ userId: user.$id, workspaceId: String(raw.workspaceId) });
+    if (!member) return null;
 
-    if (!member) {
-      return null;
-    }
-
-    return project;
+    return {
+      $id: String(raw._id),
+      $createdAt: raw.createdAt instanceof Date ? (raw.createdAt as Date).toISOString() : '',
+      name: String(raw.name),
+      imageUrl: raw.imageUrl ? String(raw.imageUrl) : undefined,
+      workspaceId: String(raw.workspaceId),
+    };
   } catch {
     return null;
   }

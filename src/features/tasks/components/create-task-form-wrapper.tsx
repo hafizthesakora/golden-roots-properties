@@ -29,7 +29,7 @@ export const CreateTaskFormWrapper = ({
 
   const memberOptions = members?.documents.map((member) => ({
     id: member.$id,
-    name: member.name,
+    name: member.name ?? '',
   }));
 
   const isLoading = isLoadingMembers || isLoadingProjects;

@@ -262,7 +262,7 @@ export const EditWorkspaceForm = ({
       <Card className="w-full h-full border-none shadow-none">
         <CardContent className="p-7">
           <div className="flex flex-col">
-            <h3 className="font-bold text-green-500">Invite Members</h3>
+            <h3 className="font-bold text-amber-600">Invite Members</h3>
             <p className="text-sm text-muted-foreground">
               Use the invite link to add members to your workspace.
             </p>

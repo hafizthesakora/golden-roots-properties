@@ -3,278 +3,134 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { createWorkspaceSchema, updateWorkspaceSchema } from '../schemas';
 import { sessionMiddleware } from '@/lib/session-middleware';
-import {
-  DATABASE_ID,
-  IMAGES_BUCKET_ID,
-  MEMBERS_ID,
-  TASKS_ID,
-  WORKSPACES_ID,
-} from '@/config';
-import { ID, Query } from 'node-appwrite';
+import { getMember } from '@/features/members/utils';
 import { MemberRole } from '@/features/members/types';
 import { generateInviteCode } from '@/lib/utils';
-import { getMember } from '@/features/members/utils';
-import { Workspace } from '../types';
+import { connectDB } from '@/lib/db';
+import { Workspace, Member, Task, ActivityLog } from '@/models';
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import { TaskStatus } from '@/features/tasks/types';
+import type { Workspace as WorkspaceType } from '../types';
+
+function toWorkspace(doc: Record<string, unknown>): WorkspaceType {
+  return {
+    $id: String(doc._id),
+    $createdAt: doc.createdAt instanceof Date ? (doc.createdAt as Date).toISOString() : '',
+    name: String(doc.name),
+    imageUrl: doc.imageUrl ? String(doc.imageUrl) : undefined,
+    inviteCode: String(doc.inviteCode),
+    userId: String(doc.userId),
+  };
+}
 
 const app = new Hono()
   .get('/', sessionMiddleware, async (c) => {
     const user = c.get('user');
-    const databases = c.get('databases');
+    await connectDB();
 
-    const members = await databases.listDocuments(DATABASE_ID, MEMBERS_ID, [
-      Query.equal('userId', user.$id),
-    ]);
+    const members = await Member.find({ userId: user.$id }).lean() as Record<string, unknown>[];
+    if (members.length === 0) return c.json({ data: { documents: [] as WorkspaceType[], total: 0 } });
 
-    if (members.total === 0) {
-      return c.json({ data: { documents: [], total: 0 } });
-    }
+    const workspaceIds = members.map((m) => String(m.workspaceId));
+    const workspaces = await Workspace.find({ _id: { $in: workspaceIds } })
+      .sort({ createdAt: -1 })
+      .lean() as Record<string, unknown>[];
 
-    const workspaceIds = members.documents.map((member) => member.workspaceId);
-
-    const workspaces = await databases.listDocuments(
-      DATABASE_ID,
-      WORKSPACES_ID,
-      [Query.orderDesc('$createdAt'), Query.contains('$id', workspaceIds)]
-    );
-    return c.json({ data: workspaces });
+    return c.json({ data: { documents: workspaces.map(toWorkspace), total: workspaces.length } });
   })
   .get('/:workspaceId', sessionMiddleware, async (c) => {
     const user = c.get('user');
-    const databases = c.get('databases');
     const { workspaceId } = c.req.param();
 
-    const member = await getMember({
-      databases,
-      workspaceId,
-      userId: user.$id,
-    });
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!member) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    await connectDB();
+    const workspace = await Workspace.findById(workspaceId).lean() as Record<string, unknown> | null;
+    if (!workspace) return c.json({ error: 'Not found' }, 404);
 
-    const workspace = await databases.getDocument<Workspace>(
-      DATABASE_ID,
-      WORKSPACES_ID,
-      workspaceId
-    );
-
-    return c.json({ data: workspace });
+    return c.json({ data: toWorkspace(workspace) });
   })
-  .post(
-    '/',
-    zValidator('form', createWorkspaceSchema),
-    sessionMiddleware,
-    async (c) => {
-      const databases = c.get('databases');
-      const storage = c.get('storage');
-      const user = c.get('user');
-
-      const { name, image } = c.req.valid('form');
-
-      let uploadedImageUrl: string | undefined;
-
-      if (image instanceof File) {
-        const file = await storage.createFile(
-          IMAGES_BUCKET_ID,
-          ID.unique(),
-          image
-        );
-
-        const arrayBuffer = await storage.getFilePreview(
-          IMAGES_BUCKET_ID,
-          file.$id
-        );
-
-        uploadedImageUrl = `data:image/png;base64,${Buffer.from(
-          arrayBuffer
-        ).toString('base64')}`;
-      }
-
-      const workspace = await databases.createDocument(
-        DATABASE_ID,
-        WORKSPACES_ID,
-        ID.unique(),
-        {
-          name,
-          userId: user.$id,
-          imageUrl: uploadedImageUrl,
-          inviteCode: generateInviteCode(6),
-        }
-      );
-
-      await databases.createDocument(DATABASE_ID, MEMBERS_ID, ID.unique(), {
-        userId: user.$id,
-        workspaceId: workspace.$id,
-        role: MemberRole.ADMIN,
-      });
-
-      return c.json({ data: workspace });
-    }
-  )
-  .patch(
-    '/:workspaceId',
-    sessionMiddleware,
-    zValidator('form', updateWorkspaceSchema),
-    async (c) => {
-      const databases = c.get('databases');
-      const storage = c.get('storage');
-      const user = c.get('user');
-
-      const { workspaceId } = c.req.param();
-      const { name, image } = c.req.valid('form');
-
-      const member = await getMember({
-        databases,
-        workspaceId,
-        userId: user.$id,
-      });
-
-      if (!member || member.role !== MemberRole.ADMIN) {
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
-      let uploadedImageUrl: string | undefined;
-
-      if (image instanceof File) {
-        const file = await storage.createFile(
-          IMAGES_BUCKET_ID,
-          ID.unique(),
-          image
-        );
-
-        const arrayBuffer = await storage.getFilePreview(
-          IMAGES_BUCKET_ID,
-          file.$id
-        );
-
-        uploadedImageUrl = `data:image/png;base64,${Buffer.from(
-          arrayBuffer
-        ).toString('base64')}`;
-      } else {
-        uploadedImageUrl = image;
-      }
-
-      const workspace = await databases.updateDocument(
-        DATABASE_ID,
-        WORKSPACES_ID,
-        workspaceId,
-        {
-          name,
-          imageUrl: uploadedImageUrl,
-        }
-      );
-      return c.json({ data: workspace });
-    }
-  )
-  .delete('/:workspaceId', sessionMiddleware, async (c) => {
-    const databases = c.get('databases');
+  .post('/', zValidator('form', createWorkspaceSchema), sessionMiddleware, async (c) => {
     const user = c.get('user');
+    const { name, image } = c.req.valid('form');
 
+    let imageUrl: string | undefined;
+    if (image instanceof File && image.size > 0) {
+      const buf = await image.arrayBuffer();
+      imageUrl = `data:${image.type || 'image/png'};base64,${Buffer.from(buf).toString('base64')}`;
+    }
+
+    await connectDB();
+    const workspace = await Workspace.create({ name, userId: user.$id, imageUrl, inviteCode: generateInviteCode(6) });
+    await Member.create({ userId: user.$id, workspaceId: workspace._id.toString(), role: MemberRole.ADMIN });
+
+    return c.json({ data: toWorkspace(workspace.toObject()) });
+  })
+  .patch('/:workspaceId', sessionMiddleware, zValidator('form', updateWorkspaceSchema), async (c) => {
+    const user = c.get('user');
+    const { workspaceId } = c.req.param();
+    const { name, image } = c.req.valid('form');
+
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member || member.role !== MemberRole.ADMIN) return c.json({ error: 'Unauthorized' }, 401);
+
+    let imageUrl: string | undefined;
+    if (image instanceof File && image.size > 0) {
+      const buf = await image.arrayBuffer();
+      imageUrl = `data:${image.type || 'image/png'};base64,${Buffer.from(buf).toString('base64')}`;
+    } else if (typeof image === 'string') {
+      imageUrl = image;
+    }
+
+    await connectDB();
+    const workspace = await Workspace.findByIdAndUpdate(workspaceId, { name, imageUrl }, { new: true }).lean() as Record<string, unknown>;
+    return c.json({ data: toWorkspace(workspace) });
+  })
+  .delete('/:workspaceId', sessionMiddleware, async (c) => {
+    const user = c.get('user');
     const { workspaceId } = c.req.param();
 
-    const member = await getMember({
-      databases,
-      workspaceId,
-      userId: user.$id,
-    });
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member || member.role !== MemberRole.ADMIN) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!member || member.role !== MemberRole.ADMIN) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    //TODO: Delete members, projects and tasks
-
-    await databases.deleteDocument(DATABASE_ID, WORKSPACES_ID, workspaceId);
-    return c.json({
-      data: {
-        $id: workspaceId,
-      },
-    });
+    await connectDB();
+    await Workspace.findByIdAndDelete(workspaceId);
+    return c.json({ data: { $id: workspaceId } });
   })
   .post('/:workspaceId/reset-invite-code', sessionMiddleware, async (c) => {
-    const databases = c.get('databases');
     const user = c.get('user');
-
     const { workspaceId } = c.req.param();
 
-    const member = await getMember({
-      databases,
-      workspaceId,
-      userId: user.$id,
-    });
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member || member.role !== MemberRole.ADMIN) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!member || member.role !== MemberRole.ADMIN) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const workspace = await databases.updateDocument(
-      DATABASE_ID,
-      WORKSPACES_ID,
-      workspaceId,
-      {
-        inviteCode: generateInviteCode(6),
-      }
-    );
-    return c.json({
-      data: workspace,
-    });
+    await connectDB();
+    const workspace = await Workspace.findByIdAndUpdate(workspaceId, { inviteCode: generateInviteCode(6) }, { new: true }).lean() as Record<string, unknown>;
+    return c.json({ data: toWorkspace(workspace) });
   })
-  .post(
-    '/:workspaceId/join',
-    sessionMiddleware,
-    zValidator('json', z.object({ code: z.string() })),
-    async (c) => {
-      const { workspaceId } = c.req.param();
-      const { code } = c.req.valid('json');
+  .post('/:workspaceId/join', sessionMiddleware, zValidator('json', z.object({ code: z.string() })), async (c) => {
+    const { workspaceId } = c.req.param();
+    const { code } = c.req.valid('json');
+    const user = c.get('user');
 
-      const databases = c.get('databases');
-      const user = c.get('user');
+    const existingMember = await getMember({ workspaceId, userId: user.$id });
+    if (existingMember) return c.json({ error: 'Already a member' }, 400);
 
-      const member = await getMember({
-        databases,
-        workspaceId,
-        userId: user.$id,
-      });
+    await connectDB();
+    const workspace = await Workspace.findById(workspaceId).lean() as Record<string, unknown> | null;
+    if (!workspace) return c.json({ error: 'Workspace not found' }, 404);
+    if (workspace.inviteCode !== code) return c.json({ error: 'Invalid invite code' }, 400);
 
-      if (member) {
-        return c.json({ error: 'Already a member' }, 400);
-      }
-
-      const workspace = await databases.getDocument<Workspace>(
-        DATABASE_ID,
-        WORKSPACES_ID,
-        workspaceId
-      );
-
-      if (workspace.inviteCode !== code) {
-        return c.json({ error: 'Invalid invite code' }, 400);
-      }
-
-      await databases.createDocument(DATABASE_ID, MEMBERS_ID, ID.unique(), {
-        workspaceId,
-        userId: user.$id,
-        role: MemberRole.MEMBER,
-      });
-
-      return c.json({ data: workspace });
-    }
-  )
+    await Member.create({ workspaceId, userId: user.$id, role: MemberRole.MEMBER });
+    return c.json({ data: toWorkspace(workspace) });
+  })
   .get('/:workspaceId/analytics', sessionMiddleware, async (c) => {
     const user = c.get('user');
-    const databases = c.get('databases');
     const { workspaceId } = c.req.param();
 
-    const member = await getMember({
-      databases,
-      workspaceId,
-      userId: user.$id,
-    });
-
-    if (!member) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member) return c.json({ error: 'Unauthorized' }, 401);
 
     const now = new Date();
     const thisMonthStart = startOfMonth(now);
@@ -282,149 +138,59 @@ const app = new Hono()
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    const thisMonthTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.greaterThanEqual('$createdAt', thisMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', thisMonthEnd.toISOString()),
-      ]
-    );
-
-    const lastMonthTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.greaterThanEqual('$createdAt', lastMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', lastMonthEnd.toISOString()),
-      ]
-    );
-
-    const taskCount = thisMonthTasks.total;
-    const taskDifference = taskCount - lastMonthTasks.total;
-
-    const thisMonthAssignedTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.equal('assigneeId', member.$id),
-        Query.greaterThanEqual('$createdAt', thisMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', thisMonthEnd.toISOString()),
-      ]
-    );
-
-    const lastMonthAssignedTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.equal('assigneeId', member.$id),
-        Query.greaterThanEqual('$createdAt', lastMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', lastMonthEnd.toISOString()),
-      ]
-    );
-
-    const assignedTaskCount = thisMonthAssignedTasks.total;
-    const assignedTaskDifference =
-      assignedTaskCount - lastMonthAssignedTasks.total;
-
-    const thisMonthIncompleteTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.notEqual('status', TaskStatus.DONE),
-        Query.greaterThanEqual('$createdAt', thisMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', thisMonthEnd.toISOString()),
-      ]
-    );
-
-    const lastMonthIncompleteTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.notEqual('status', TaskStatus.DONE),
-        Query.greaterThanEqual('$createdAt', lastMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', lastMonthEnd.toISOString()),
-      ]
-    );
-
-    const incompleteTaskCount = thisMonthIncompleteTasks.total;
-    const incompleteTaskDifference =
-      incompleteTaskCount - lastMonthIncompleteTasks.total;
-
-    const thisMonthCompletedTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.equal('status', TaskStatus.DONE),
-        Query.greaterThanEqual('$createdAt', thisMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', thisMonthEnd.toISOString()),
-      ]
-    );
-
-    const lastMonthCompletedTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.equal('status', TaskStatus.DONE),
-        Query.greaterThanEqual('$createdAt', lastMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', lastMonthEnd.toISOString()),
-      ]
-    );
-
-    const completedTaskCount = thisMonthCompletedTasks.total;
-    const completedTaskDifference =
-      completedTaskCount - lastMonthCompletedTasks.total;
-
-    const thisMonthOverdueTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.notEqual('status', TaskStatus.DONE),
-        Query.lessThan('dueDate', now.toISOString()),
-        Query.greaterThanEqual('$createdAt', thisMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', thisMonthEnd.toISOString()),
-      ]
-    );
-
-    const lastMonthOverdueTasks = await databases.listDocuments(
-      DATABASE_ID,
-      TASKS_ID,
-      [
-        Query.equal('workspaceId', workspaceId),
-        Query.notEqual('status', TaskStatus.DONE),
-        Query.lessThan('dueDate', now.toISOString()),
-        Query.greaterThanEqual('$createdAt', lastMonthStart.toISOString()),
-        Query.lessThanEqual('$createdAt', lastMonthEnd.toISOString()),
-      ]
-    );
-
-    const overdueTaskCount = thisMonthOverdueTasks.total;
-    const overdueTaskDifference =
-      overdueTaskCount - lastMonthOverdueTasks.total;
+    await connectDB();
+    const [taskCount, lastCount] = await Promise.all([
+      Task.countDocuments({ workspaceId, createdAt: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
+      Task.countDocuments({ workspaceId, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    ]);
+    const [assignedCount, lastAssigned] = await Promise.all([
+      Task.countDocuments({ workspaceId, assigneeId: member.$id, createdAt: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
+      Task.countDocuments({ workspaceId, assigneeId: member.$id, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    ]);
+    const [incompleteCount, lastIncomplete] = await Promise.all([
+      Task.countDocuments({ workspaceId, status: { $ne: TaskStatus.DONE }, createdAt: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
+      Task.countDocuments({ workspaceId, status: { $ne: TaskStatus.DONE }, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    ]);
+    const [completedCount, lastCompleted] = await Promise.all([
+      Task.countDocuments({ workspaceId, status: TaskStatus.DONE, createdAt: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
+      Task.countDocuments({ workspaceId, status: TaskStatus.DONE, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    ]);
+    const [overdueCount, lastOverdue] = await Promise.all([
+      Task.countDocuments({ workspaceId, status: { $ne: TaskStatus.DONE }, dueDate: { $lt: now.toISOString() }, createdAt: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
+      Task.countDocuments({ workspaceId, status: { $ne: TaskStatus.DONE }, dueDate: { $lt: now.toISOString() }, createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    ]);
 
     return c.json({
       data: {
-        taskCount,
-        taskDifference,
-        assignedTaskCount,
-        assignedTaskDifference,
-        completedTaskCount,
-        completedTaskDifference,
-        incompleteTaskCount,
-        incompleteTaskDifference,
-        overdueTaskCount,
-        overdueTaskDifference,
+        taskCount, taskDifference: taskCount - lastCount,
+        assignedTaskCount: assignedCount, assignedTaskDifference: assignedCount - lastAssigned,
+        incompleteTaskCount: incompleteCount, incompleteTaskDifference: incompleteCount - lastIncomplete,
+        completedTaskCount: completedCount, completedTaskDifference: completedCount - lastCompleted,
+        overdueTaskCount: overdueCount, overdueTaskDifference: overdueCount - lastOverdue,
       },
     });
+  })
+  // ── Activity Log ─────────────────────────────────────────────────────────────
+  .get('/:workspaceId/activity', sessionMiddleware, async (c) => {
+    const user = c.get('user');
+    const { workspaceId } = c.req.param();
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member) return c.json({ error: 'Unauthorized' }, 401);
+    await connectDB();
+    const logs = await ActivityLog.find({ workspaceId }).sort({ createdAt: -1 }).limit(50).lean() as Record<string, unknown>[];
+    const docs = logs.map((l) => ({
+      $id: String(l._id),
+      $createdAt: l.createdAt instanceof Date ? (l.createdAt as Date).toISOString() : '',
+      workspaceId: String(l.workspaceId),
+      userId: String(l.userId),
+      userName: String(l.userName),
+      action: String(l.action),
+      entityType: String(l.entityType),
+      entityId: String(l.entityId),
+      entityName: String(l.entityName),
+      details: l.details ? String(l.details) : undefined,
+    }));
+    return c.json({ data: docs });
   });
 
 export default app;

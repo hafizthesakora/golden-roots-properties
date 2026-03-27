@@ -20,7 +20,15 @@ export const ResponsiveModal = ({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full sm:max-w-lg p-0 border-none overflow-y-auto hide-scrollbar max-h-[85vh]">
+        <DialogContent
+          className="w-full sm:max-w-lg p-0 border-none overflow-y-auto hide-scrollbar max-h-[85vh]"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-radix-popper-content-wrapper]')) {
+              e.preventDefault();
+            }
+          }}
+        >
           {children}
         </DialogContent>
       </Dialog>
