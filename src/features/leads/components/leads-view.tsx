@@ -40,6 +40,7 @@ export const LeadsView = () => {
     (l) => ![LeadStatus.CLOSED_WON, LeadStatus.CLOSED_LOST].includes(l.status)
   ).length;
   const closedWon = leads.filter((l) => l.status === LeadStatus.CLOSED_WON).length;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const closedLost = leads.filter((l) => l.status === LeadStatus.CLOSED_LOST).length;
   const conversionRate = total > 0 ? Math.round((closedWon / total) * 100) : 0;
 

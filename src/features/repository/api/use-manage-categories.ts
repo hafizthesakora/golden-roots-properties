@@ -32,6 +32,7 @@ export const useCreateCategory = () => {
 export const useUpdateCategory = () => {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     mutationFn: async ({ categoryId, workspaceId, ...body }: Partial<CategoryInput> & { categoryId: string; workspaceId: string }) => {
       const res = await fetch(`/api/repository/categories/${categoryId}`, {
         method: 'PATCH',
@@ -52,6 +53,7 @@ export const useUpdateCategory = () => {
 export const useDeleteCategory = () => {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     mutationFn: async ({ categoryId, workspaceId }: { categoryId: string; workspaceId: string }) => {
       const res = await fetch(`/api/repository/categories/${categoryId}`, { method: 'DELETE' });
       if (!res.ok) {

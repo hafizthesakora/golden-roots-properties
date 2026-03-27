@@ -21,6 +21,7 @@ const COOKIE_OPTS = {
 const app = new Hono()
   .get('/current', sessionMiddleware, (c) => {
     const user = c.get('user');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _, ...safe } = user as typeof user & { passwordHash?: string };
     return c.json({ data: safe });
   })

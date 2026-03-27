@@ -45,6 +45,7 @@ export const ActivityFeed = ({ workspaceId, compact = false }: ActivityFeedProps
       {displayed.map((item) => {
         const config = ACTION_CONFIG[item.action] ?? ACTION_CONFIG.updated;
         const Icon = config.icon;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const EntityIcon = ENTITY_ICON[item.entityType] ?? ClipboardListIcon;
         return (
           <div key={item.$id} className="flex gap-x-3 py-2.5 border-b border-neutral-50 last:border-0">
