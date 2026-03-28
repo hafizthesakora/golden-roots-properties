@@ -6,6 +6,7 @@ import { getMember } from '../utils';
 import { Member, User } from '@/models';
 import { connectDB } from '@/lib/db';
 import { MemberRole, type Member as MemberType } from '../types';
+import bcrypt from 'bcryptjs';
 
 function toMember(doc: Record<string, unknown>, name?: string, email?: string): MemberType {
   return {
@@ -56,6 +57,29 @@ const app = new Hono()
 
     await Member.findByIdAndDelete(memberId);
     return c.json({ data: { $id: memberId } });
+  })
+  .post('/create-account', sessionMiddleware, zValidator('json', z.object({
+    workspaceId: z.string(),
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(6),
+    role: z.nativeEnum(MemberRole).default(MemberRole.MEMBER),
+  })), async (c) => {
+    const user = c.get('user');
+    const { workspaceId, name, email, password, role } = c.req.valid('json');
+
+    await connectDB();
+    const member = await getMember({ workspaceId, userId: user.$id });
+    if (!member || member.role !== MemberRole.ADMIN) return c.json({ error: 'Only admins can create accounts' }, 401);
+
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) return c.json({ error: 'An account with this email already exists' }, 400);
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const newUser = await User.create({ name, email: email.toLowerCase(), passwordHash });
+    await Member.create({ userId: newUser._id.toString(), workspaceId, role });
+
+    return c.json({ data: { $id: newUser._id.toString(), name, email } });
   })
   .patch('/:memberId', sessionMiddleware, zValidator('json', z.object({ role: z.nativeEnum(MemberRole) })), async (c) => {
     const { memberId } = c.req.param();

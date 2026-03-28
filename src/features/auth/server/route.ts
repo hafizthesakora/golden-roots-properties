@@ -39,19 +39,9 @@ const app = new Hono()
     setCookie(c, AUTH_COOKIE, token, COOKIE_OPTS);
     return c.json({ success: true });
   })
-  .post('/register', zValidator('json', registerSchema), async (c) => {
-    const { name, email, password } = c.req.valid('json');
-
-    await connectDB();
-    const existing = await User.findOne({ email: email.toLowerCase() });
-    if (existing) return c.json({ error: 'Email already in use' }, 400);
-
-    const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, email: email.toLowerCase(), passwordHash });
-
-    const token = await signToken({ userId: user._id.toString(), email: user.email });
-    setCookie(c, AUTH_COOKIE, token, COOKIE_OPTS);
-    return c.json({ success: true });
+  .post('/register', async (c) => {
+    // Public self-registration is disabled. Accounts are created by admins only.
+    return c.json({ error: 'Registration is disabled. Contact your administrator.' }, 403);
   })
   .post('/logout', sessionMiddleware, (c) => {
     deleteCookie(c, AUTH_COOKIE);

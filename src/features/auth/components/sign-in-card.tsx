@@ -16,7 +16,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import Link from 'next/link';
 import { loginSchema } from '../schemas';
 import { useLogin } from '../api/use-login';
 
@@ -95,11 +94,8 @@ export const SignInCard = () => {
       </CardContent>
       <div className="px-8"><DottedSeparator /></div>
       <CardContent className="p-6 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="text-green-700 font-semibold hover:underline">
-            Sign Up
-          </Link>
+        <p className="text-sm text-muted-foreground text-center">
+          Don&apos;t have an account? Contact your administrator.
         </p>
       </CardContent>
     </Card>
