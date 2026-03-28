@@ -29,7 +29,6 @@ export function PWAInstallButton() {
 
   useEffect(() => {
     if (isInStandaloneMode()) { setInstalled(true); return; }
-
     const handler = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
@@ -61,29 +60,38 @@ export function PWAInstallButton() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 80 }}
             transition={{ type: 'spring', bounce: 0.3, delay: 1.5 }}
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm"
+            className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-auto sm:min-w-[360px] sm:max-w-sm sm:p-0"
           >
-            <div className="bg-green-800 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/icon-72x72.png" alt="Golden Roots" className="size-12 rounded-xl shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">Install Golden Roots</p>
-                <p className="text-white/70 text-xs">Add to your home screen for quick access</p>
-              </div>
-              <div className="flex flex-col gap-1.5 shrink-0">
-                <Button
-                  size="sm"
-                  onClick={handleInstall}
-                  className="bg-amber-400 hover:bg-amber-300 text-green-900 font-semibold text-xs h-8 px-3"
+            <div className="bg-green-800 text-white rounded-2xl shadow-2xl overflow-hidden">
+              {/* Top row: icon + text + close */}
+              <div className="flex items-center gap-3 p-4 pb-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/icon-72x72.png" alt="Golden Roots" className="size-11 rounded-xl shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm leading-tight">Install Golden Roots</p>
+                  <p className="text-white/70 text-xs mt-0.5">Add to your home screen for quick access</p>
+                </div>
+                <button
+                  onClick={() => setDismissed(true)}
+                  className="text-white/50 hover:text-white transition-colors p-1 shrink-0 self-start"
                 >
-                  <DownloadIcon className="size-3 mr-1" />
-                  Install
+                  <XIcon className="size-4" />
+                </button>
+              </div>
+
+              {/* Bottom row: buttons */}
+              <div className="flex gap-2 px-4 pb-4">
+                <Button
+                  onClick={handleInstall}
+                  className="flex-1 bg-amber-400 hover:bg-amber-300 text-green-900 font-semibold text-sm h-10"
+                >
+                  <DownloadIcon className="size-4 mr-2" />
+                  Install App
                 </Button>
                 <Button
-                  size="sm"
                   variant="ghost"
                   onClick={() => setDismissed(true)}
-                  className="text-white/60 hover:text-white hover:bg-white/10 text-xs h-6 px-2"
+                  className="text-white/70 hover:text-white hover:bg-white/10 text-sm h-10 px-4"
                 >
                   Not now
                 </Button>
@@ -100,15 +108,15 @@ export function PWAInstallButton() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={() => setShowIOSGuide(false)}
           >
             <motion.div
-              initial={{ y: 100, opacity: 0 }}
+              initial={{ y: 60, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              transition={{ type: 'spring', bounce: 0.25 }}
-              className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl"
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ type: 'spring', bounce: 0.2 }}
+              className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-5">
@@ -120,19 +128,19 @@ export function PWAInstallButton() {
                     <p className="text-xs text-neutral-500">3 quick steps</p>
                   </div>
                 </div>
-                <button onClick={() => setShowIOSGuide(false)} className="text-neutral-400 hover:text-neutral-600 p-1">
+                <button onClick={() => setShowIOSGuide(false)} className="text-neutral-400 hover:text-neutral-600 p-1 -mr-1">
                   <XIcon className="size-5" />
                 </button>
               </div>
 
               <div className="flex flex-col gap-4">
-                <Step number={1} icon={<Share2Icon className="size-5 text-green-700" />} title='Tap the Share button' description='Find the share icon at the bottom of your Safari browser' />
-                <Step number={2} icon={<PlusSquareIcon className="size-5 text-green-700" />} title='Add to Home Screen' description='Scroll down in the share menu and tap "Add to Home Screen"' />
-                <Step number={3} icon={<SmartphoneIcon className="size-5 text-green-700" />} title='Tap Add' description='Confirm by tapping "Add" in the top right corner' />
+                <Step number={1} icon={<Share2Icon className="size-5 text-green-700" />} title="Tap the Share button" description="Find the share icon at the bottom of your Safari browser" />
+                <Step number={2} icon={<PlusSquareIcon className="size-5 text-green-700" />} title="Add to Home Screen" description='Scroll down in the share menu and tap "Add to Home Screen"' />
+                <Step number={3} icon={<SmartphoneIcon className="size-5 text-green-700" />} title="Tap Add" description='Confirm by tapping "Add" in the top right corner' />
               </div>
 
               <Button
-                className="w-full mt-6 bg-green-800 hover:bg-green-700 text-white"
+                className="w-full mt-6 bg-green-800 hover:bg-green-700 text-white h-11"
                 onClick={() => { setShowIOSGuide(false); setDismissed(true); }}
               >
                 Got it
@@ -145,13 +153,15 @@ export function PWAInstallButton() {
   );
 }
 
-function Step({ number, icon, title, description }: { number: number; icon: React.ReactNode; title: string; description: string }) {
+function Step({ number, icon, title, description }: {
+  number: number; icon: React.ReactNode; title: string; description: string;
+}) {
   return (
     <div className="flex items-start gap-3">
       <div className="size-7 rounded-full bg-green-50 border border-green-200 flex items-center justify-center shrink-0 text-green-800 font-bold text-xs mt-0.5">
         {number}
       </div>
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2.5">
         <div className="mt-0.5 shrink-0">{icon}</div>
         <div>
           <p className="text-sm font-semibold text-neutral-800">{title}</p>
