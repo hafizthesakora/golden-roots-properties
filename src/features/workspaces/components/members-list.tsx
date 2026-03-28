@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWorkspaceId } from '../hooks/use-workspace-id';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,10 +11,7 @@ import { Fragment } from 'react';
 import { MemberAvatar } from '@/features/members/components/members-avatar';
 import { Separator } from '@/components/ui/separator';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useDeleteMember } from '@/features/members/api/use-delete-member';
 import { useUpdateMember } from '@/features/members/api/use-update-member';
@@ -26,15 +23,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ResponsiveModal } from '@/components/responsive-modal';
-import { getCurrent } from '@/features/auth/actions';
-import { useEffect } from 'react';
+import { useCurrent } from '@/features/auth/api/use-current';
 import type { Member } from '@/features/members/types';
 
 export const MembersList = () => {
   const workspaceId = useWorkspaceId();
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ $id: string } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const [ConfirmDialog, confirm] = useConfirm(
@@ -42,16 +37,11 @@ export const MembersList = () => {
     'This member will be removed from the workspace',
     'destructive'
   );
+
+  const { data: currentUser } = useCurrent();
   const { data } = useGetMembers({ workspaceId });
   const { mutate: deleteMember, isPending: isDeletingMember } = useDeleteMember();
   const { mutate: updateMember, isPending: isUpdatingMember } = useUpdateMember();
-
-  useEffect(() => {
-    getCurrent().then((user) => {
-      if (!user) return;
-      setCurrentUser(user as { $id: string });
-    });
-  }, []);
 
   useEffect(() => {
     if (!currentUser || !data) return;
@@ -91,9 +81,7 @@ export const MembersList = () => {
           </Button>
         )}
       </CardHeader>
-      <div className="px-7">
-        <DottedSeparator />
-      </div>
+      <div className="px-7"><DottedSeparator /></div>
       <CardContent className="p-7">
         {data?.documents.map((member, index) => (
           <Fragment key={member.$id}>
