@@ -6,6 +6,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
 import { QueryProvider } from '@/components/query-provider';
+import { PWAInstallButton } from '@/components/pwa-install-button';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -52,6 +53,7 @@ export default function RootLayout({
         <QueryProvider>
           <Toaster />
           {children}
+          <PWAInstallButton />
         </QueryProvider>
       </body>
     </html>
