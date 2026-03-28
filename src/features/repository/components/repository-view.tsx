@@ -32,10 +32,6 @@ export const RepositoryView = () => {
   return (
     <div className="flex flex-col gap-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold">File Repository</h2>
-          <p className="text-sm text-neutral-500">Files are stored securely on Google Drive</p>
-        </div>
         <div className="flex items-center gap-x-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => setManageOpen(true)}>
             <SlidersHorizontalIcon className="size-4 mr-2" />

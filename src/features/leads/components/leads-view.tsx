@@ -48,12 +48,6 @@ export const LeadsView = () => {
     <div className="flex flex-col gap-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-neutral-900">Leads Pipeline</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track and manage your property leads from first contact to close
-          </p>
-        </div>
         <Button
           onClick={open}
           className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm w-full sm:w-auto shrink-0"

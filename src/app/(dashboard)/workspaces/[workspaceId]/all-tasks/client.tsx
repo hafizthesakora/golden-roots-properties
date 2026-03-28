@@ -10,11 +10,7 @@ export const AllTasksClient = () => {
       <CreateTaskModal />
       <EditTaskModal />
       <div className="h-full flex flex-col">
-        <div className="mb-4">
-          <h2 className="text-2xl font-bold">All Tasks</h2>
-          <p className="text-sm text-neutral-500">View and manage every task across all projects in this workspace</p>
-        </div>
-        <TaskViewSwitcher hideProjectFilter={false} />
+<TaskViewSwitcher hideProjectFilter={false} />
       </div>
     </>
   );
