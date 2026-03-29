@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import bcrypt from 'bcryptjs';
 
-import { loginSchema, registerSchema } from '../schemas';
+import { loginSchema } from '../schemas';
 import { AUTH_COOKIE } from '../constants';
 import { sessionMiddleware } from '@/lib/session-middleware';
 import { connectDB } from '@/lib/db';
